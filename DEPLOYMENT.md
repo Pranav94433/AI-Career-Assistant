@@ -1,42 +1,16 @@
 # Deploying the AI Career Assistant
 
-## Important: Ollama hosting
+## AI provider
 
-This app currently uses Ollama through `ollama.chat()`. Local Ollama works on your computer, but Streamlit Community Cloud cannot connect to your computer's Ollama service.
+The app uses Groq's hosted `llama-3.3-70b-versatile` model. No local Ollama installation is required.
 
-The app now supports `OLLAMA_HOST`. The simplest production setup is one Ubuntu VPS running both Ollama and Streamlit. Do not expose Ollama's port directly to the public internet.
+Create a Groq API key at https://console.groq.com/keys. Groq provides a free developer tier with usage limits.
 
-## Ubuntu VPS setup
-
-On a fresh Ubuntu 22.04/24.04 server, run:
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.2:1b
-sudo apt update && sudo apt install -y python3-venv git
-git clone YOUR_GITHUB_REPOSITORY_URL AI-Career-Assistant
-cd AI-Career-Assistant
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-streamlit run app.py --server.address 0.0.0.0 --server.port 8501
-```
-
-Open the server address in your browser. The app uses local Ollama automatically when `OLLAMA_HOST` is not set.
-
-For a separate app server, add this to `.streamlit/secrets.toml`:
+In Streamlit Cloud, open **Settings > Secrets** and add:
 
 ```toml
-OLLAMA_HOST = "http://YOUR_PRIVATE_OLLAMA_SERVER:11434"
+GROQ_API_KEY = "your-groq-api-key"
 ```
-
-Use a private network or VPN between servers. Ollama should listen on localhost unless a protected private network is configured.
-
-Before deploying publicly, choose one of these options:
-
-- Deploy Ollama on a server with a public/private reachable URL and configure the Ollama client to use it.
-- Replace the Ollama call with a hosted model provider such as OpenAI, Groq, or OpenRouter.
-- Run the app on your own computer or a server where Ollama is installed.
 
 ## Streamlit Community Cloud
 
