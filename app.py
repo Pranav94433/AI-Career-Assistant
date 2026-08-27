@@ -113,6 +113,17 @@ html, body, [class*="css"] {
     font-weight: 700;
 }
 
+[data-testid="stExpander"] {
+    border: 1px solid #3f9f7f;
+    border-radius: 10px;
+    background: #101817;
+}
+
+[data-testid="stExpander"] summary {
+    color: #8de0c2 !important;
+    font-weight: 700;
+}
+
 [data-testid="stChatMessage"] {
     background: transparent;
     border: 0;
@@ -452,6 +463,28 @@ def extract_resume_text(uploaded_file):
     raise ValueError("Unsupported file type")
 
 
+def process_uploaded_resume(uploaded_resume):
+
+    if uploaded_resume is None:
+        return
+
+    resume_id = f"{uploaded_resume.name}:{uploaded_resume.size}"
+    if st.session_state.get("resume_id") == resume_id:
+        return
+
+    try:
+        resume_text = extract_resume_text(uploaded_resume)
+        st.session_state.resume_text = resume_text
+        st.session_state.resume_id = resume_id
+        st.session_state.resume_name = uploaded_resume.name
+        st.session_state.resume_error = ""
+    except Exception as error:
+        st.session_state.resume_text = ""
+        st.session_state.resume_id = resume_id
+        st.session_state.resume_name = uploaded_resume.name
+        st.session_state.resume_error = str(error)
+
+
 def get_response_text(response_chunk):
 
     if isinstance(response_chunk, dict):
@@ -550,25 +583,18 @@ with st.sidebar:
     uploaded_resume = st.file_uploader(
         "Choose a resume file",
         type=["pdf", "docx", "txt"],
+        key="sidebar_resume_uploader",
         help="Upload a text-based PDF, DOCX, or TXT resume to ask questions about it."
     )
 
-    if uploaded_resume is not None:
-        resume_id = f"{uploaded_resume.name}:{uploaded_resume.size}"
+    process_uploaded_resume(uploaded_resume)
 
-        if st.session_state.get("resume_id") != resume_id:
-            try:
-                st.session_state.resume_text = extract_resume_text(uploaded_resume)
-                st.session_state.resume_id = resume_id
-            except Exception as error:
-                st.session_state.resume_text = ""
-                st.session_state.resume_id = resume_id
-                st.error(f"Could not read the resume: {error}")
-
-        if st.session_state.get("resume_text"):
-            st.success(f"Resume loaded: {uploaded_resume.name}")
-        elif not st.session_state.get("resume_error"):
-            st.warning("No readable text was found in that file.")
+    if st.session_state.get("resume_text"):
+        st.success(f"Resume loaded: {st.session_state.resume_name}")
+    elif st.session_state.get("resume_error"):
+        st.error(f"Could not read the resume: {st.session_state.resume_error}")
+    elif uploaded_resume is not None:
+        st.warning("No readable text was found in that file.")
 
     if st.session_state.get("resume_text"):
         st.caption("You can now ask questions about your resume in the chat below.")
@@ -652,6 +678,21 @@ st.write(
     "Ask me about careers, skills, resumes, "
     "interviews, jobs, and professional development."
 )
+
+with st.expander("📄 Upload resume here", expanded=not bool(st.session_state.get("resume_text"))):
+    st.caption("On mobile, use this upload area directly. On desktop, the sidebar uploader also works.")
+    mobile_resume = st.file_uploader(
+        "Choose PDF, DOCX, or TXT resume",
+        type=["pdf", "docx", "txt"],
+        key="main_resume_uploader",
+        help="Upload your resume to ask questions about your experience and skills.",
+    )
+    process_uploaded_resume(mobile_resume)
+
+    if st.session_state.get("resume_text"):
+        st.success(f"Resume ready: {st.session_state.resume_name}")
+    elif st.session_state.get("resume_error"):
+        st.error(f"Could not read the resume: {st.session_state.resume_error}")
 
 
 # ============================================================
