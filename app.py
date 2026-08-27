@@ -5,6 +5,7 @@ except ImportError:
     Groq = None
 import io
 import os
+import base64
 import smtplib
 from datetime import datetime
 from email.message import EmailMessage
@@ -470,7 +471,50 @@ def extract_resume_text(uploaded_file):
             raise ValueError("The TXT file is empty. Add resume text and upload it again.")
         return resume_text
 
-    raise ValueError("Unsupported file type. Please upload a PDF, DOCX, or TXT file.")
+    if file_type in {".jpg", ".jpeg", ".png", ".webp"}:
+        groq_client = get_groq_client()
+        available_models = {
+            model.id for model in groq_client.models.list().data
+        }
+        vision_model = "meta-llama/llama-4-scout-17b-16e-instruct"
+        if vision_model not in available_models:
+            raise ValueError("Image resumes require the Llama 4 Scout model. Upload a PDF, DOCX, or TXT resume instead.")
+
+        mime_type = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".webp": "image/webp",
+        }[file_type]
+        image_data = base64.b64encode(file_bytes).decode("ascii")
+        response = groq_client.chat.completions.create(
+            model=vision_model,
+            temperature=0,
+            max_tokens=2000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Extract all readable text from this resume image. Preserve headings, dates, skills, education, experience, and project details. Return only the extracted text.",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_data}",
+                            },
+                        },
+                    ],
+                }
+            ],
+        )
+        resume_text = response.choices[0].message.content.strip()
+        if not resume_text:
+            raise ValueError("No readable text was found in the resume image. Upload a clearer image or a PDF/DOCX/TXT file.")
+        return resume_text
+
+    raise ValueError("Unsupported file type. Please upload a PDF, DOCX, TXT, JPG, JPEG, PNG, or WEBP file.")
 
 
 def process_uploaded_resume(uploaded_resume):
@@ -668,14 +712,14 @@ st.write(
     "interviews, jobs, and professional development."
 )
 st.subheader("Upload your resume")
-st.caption("Choose a resume from your phone, tablet, or computer. Supported formats: PDF, DOCX, TXT, JPG, JPEG, PNG, or WEBP.")
+st.caption("Choose a resume from Files or your device. Supported formats: PDF, DOCX, TXT, JPG, JPEG, PNG, or WEBP.")
 
 uploaded_resume = st.file_uploader(
     "Choose a resume from your device",
-    type=["pdf", "docx", "txt", "jpg", "jpeg", "png", "webp"],
+    type=None,
     key="resume_uploader",
     accept_multiple_files=False,
-    help="Works on mobile, tablet, and PC. Select a PDF, DOCX, TXT, JPG, JPEG, PNG, or WEBP file from your device.",
+    help="Tap Browse or Files on mobile and select a PDF, DOCX, TXT, JPG, JPEG, PNG, or WEBP file. Other file types will be rejected.",
 )
 
 process_uploaded_resume(uploaded_resume)
