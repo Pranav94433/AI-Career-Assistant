@@ -1,8 +1,8 @@
 import streamlit as st
 try:
-    import ollama
+    from groq import Groq
 except ImportError:
-    ollama = None
+    Groq = None
 import io
 import os
 import smtplib
@@ -290,7 +290,7 @@ div.stButton > button:hover {
 </style>
 """, unsafe_allow_html=True)
 
-MODEL_NAME = "llama3.2:1b"
+MODEL_NAME = "llama-3.1-8b-instant"
 
 KNOWLEDGE_FILE = "universal_ai_career_assistant_knowledge_base.txt"
 FEEDBACK_RECIPIENT = "pranavkumar86530@gmail.com"
@@ -401,20 +401,16 @@ Answer in a friendly structure with a short direct answer, 3-6 useful bullets,
 and one thoughtful follow-up question when it would help the user continue.
 """
 
-    ollama_client = get_ollama_client()
+    groq_client = get_groq_client()
 
-    return ollama_client.chat(
+    return groq_client.chat.completions.create(
 
         model=MODEL_NAME,
 
         stream=True,
 
-        keep_alive="10m",
-
-        options={
-            "temperature": 0.2,
-            "num_predict": 300
-        },
+        temperature=0.2,
+        max_tokens=300,
 
         messages=[
             {
@@ -454,9 +450,12 @@ def get_response_text(response_chunk):
     if isinstance(response_chunk, dict):
         return response_chunk.get("message", {}).get("content", "")
 
-    message = getattr(response_chunk, "message", None)
+    choices = getattr(response_chunk, "choices", [])
+    if choices:
+        delta = getattr(choices[0], "delta", None)
+        return getattr(delta, "content", "") or ""
 
-    return getattr(message, "content", "")
+    return ""
 
 
 def get_setting(name, default=""):
@@ -471,10 +470,12 @@ def get_setting(name, default=""):
 
 
 @st.cache_resource
-def get_ollama_client():
+def get_groq_client():
 
-    ollama_host = get_setting("OLLAMA_HOST", "http://localhost:11434")
-    return ollama.Client(host=ollama_host)
+    groq_api_key = get_setting("GROQ_API_KEY")
+    if not groq_api_key:
+        raise ValueError("GROQ_API_KEY is not configured")
+    return Groq(api_key=groq_api_key)
 
 
 def send_feedback_email(rating, feedback):
@@ -647,18 +648,18 @@ if not chunks:
 
 
 # ============================================================
-# CHECK OLLAMA
+# CHECK GROQ CONFIGURATION
 # ============================================================
 
 try:
 
-    get_ollama_client().list()
+    get_groq_client()
 
-except Exception:
+except ValueError:
 
     st.error(
-        "Ollama is not running. "
-        "Please install and start Ollama."
+        "GROQ_API_KEY is not configured. Add it in Streamlit Cloud "
+        "under Settings > Secrets, then reboot the app."
     )
 
     st.stop()
@@ -795,8 +796,8 @@ Error while generating the response:
 
 {error}
 
-Please make sure Ollama is running and the model
-'{MODEL_NAME}' has been downloaded.
+Please check that your GROQ_API_KEY is configured correctly
+and that the Groq service is available.
 """
 
                 st.error(error_message)
