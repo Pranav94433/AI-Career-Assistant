@@ -417,7 +417,7 @@ around 6-10 bullet points or short paragraphs. Never stop after only one sentenc
         stream=True,
 
         temperature=0.2,
-        max_tokens=700,
+        max_tokens=1200,
 
         messages=[
             {
