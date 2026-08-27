@@ -1,6 +1,6 @@
 streamlit
-ollama
 scikit-learn
 numpy
 pypdf
 python-docx
+groq
