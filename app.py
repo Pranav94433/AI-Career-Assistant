@@ -401,8 +401,10 @@ Context:
 Recent conversation memory:
 {memory_context or "No previous conversation yet."}
 
-Answer in a friendly structure with a short direct answer, 3-6 useful bullets,
-and one thoughtful follow-up question when it would help the user continue.
+Answer in a friendly structure with a direct answer, a brief explanation,
+practical steps or examples, and a thoughtful follow-up question when it would
+help the user continue. Give enough detail to be genuinely useful, usually
+around 6-10 bullet points or short paragraphs. Never stop after only one sentence.
 """
 
     groq_client = get_groq_client()
@@ -415,7 +417,7 @@ and one thoughtful follow-up question when it would help the user continue.
         stream=True,
 
         temperature=0.2,
-        max_tokens=300,
+        max_tokens=700,
 
         messages=[
             {
@@ -576,14 +578,14 @@ with st.sidebar:
     st.subheader("What can I help with?")
 
     topic_questions = {
-        "Career guidance": "What career direction would fit my interests and current skills?",
-        "Resume improvement": "How can I improve my resume to get more interviews?",
-        "Interview preparation": "Help me prepare for an upcoming job interview.",
-        "Career roadmaps": "Create a practical career roadmap for me.",
-        "Skill recommendations": "Which skills should I learn next for my target career?",
-        "Job search guidance": "What is the best strategy for finding a suitable job?",
-        "LinkedIn advice": "How can I improve my LinkedIn profile and presence?",
-        "Career changes": "How can I plan a successful career change?",
+        "Career guidance": "Give me personalized career guidance. Explain how I can choose a career direction based on my interests, education, experience, and current skills. Include practical next steps.",
+        "Resume improvement": "Review my resume if I uploaded one and give detailed, actionable improvements for its content, structure, achievements, keywords, and formatting.",
+        "Interview preparation": "Help me prepare for a job interview with common questions, answer frameworks, sample answers, and a practice plan.",
+        "Career roadmaps": "Create a detailed 30-60-90 day career roadmap with skills to learn, projects to complete, and measurable goals.",
+        "Skill recommendations": "Recommend the most valuable skills I should learn next for my target career. Explain why each skill matters and how to practice it.",
+        "Job search guidance": "Give me a practical job-search strategy including suitable job boards, networking, applications, tracking, and ways to improve my chances.",
+        "LinkedIn advice": "Explain how to improve my LinkedIn profile, headline, About section, skills, projects, networking, and recruiter visibility.",
+        "Career changes": "Help me plan a realistic career change. Compare my transferable skills, identify gaps, suggest target roles, and create a step-by-step transition plan.",
     }
 
     for topic, topic_question in topic_questions.items():
