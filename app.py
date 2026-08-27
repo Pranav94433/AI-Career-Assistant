@@ -290,7 +290,7 @@ div.stButton > button:hover {
 </style>
 """, unsafe_allow_html=True)
 
-MODEL_NAME = "llama-3.1-8b-instant"
+MODEL_NAME = "llama-3.3-70b-versatile"
 
 KNOWLEDGE_FILE = "universal_ai_career_assistant_knowledge_base.txt"
 FEEDBACK_RECIPIENT = "pranavkumar86530@gmail.com"
