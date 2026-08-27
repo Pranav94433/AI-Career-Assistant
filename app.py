@@ -290,7 +290,11 @@ div.stButton > button:hover {
 </style>
 """, unsafe_allow_html=True)
 
-MODEL_NAME = "llama-3.3-70b-versatile"
+PREFERRED_MODELS = [
+    "openai/gpt-oss-20b",
+    "llama-4-scout-17b-16e-instruct",
+    "qwen/qwen3-32b",
+]
 
 KNOWLEDGE_FILE = "universal_ai_career_assistant_knowledge_base.txt"
 FEEDBACK_RECIPIENT = "pranavkumar86530@gmail.com"
@@ -402,10 +406,11 @@ and one thoughtful follow-up question when it would help the user continue.
 """
 
     groq_client = get_groq_client()
+    model_name = get_available_model(groq_client)
 
     return groq_client.chat.completions.create(
 
-        model=MODEL_NAME,
+        model=model_name,
 
         stream=True,
 
@@ -476,6 +481,22 @@ def get_groq_client():
     if not groq_api_key:
         raise ValueError("GROQ_API_KEY is not configured")
     return Groq(api_key=groq_api_key)
+
+
+def get_available_model(groq_client):
+
+    available_models = {
+        model.id for model in groq_client.models.list().data
+    }
+
+    for model_name in PREFERRED_MODELS:
+        if model_name in available_models:
+            return model_name
+
+    raise ValueError(
+        "No supported chat model is available for this Groq API key. "
+        "Check the Models page in the Groq console."
+    )
 
 
 def send_feedback_email(rating, feedback):
