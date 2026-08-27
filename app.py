@@ -66,6 +66,7 @@ html, body, [class*="css"] {
     border-radius: 8px;
     box-shadow: 0 5px 16px rgba(22, 125, 114, 0.16);
     padding: 0.8rem;
+    width: 100%;
 }
 
 [data-testid="stMainBlockContainer"] {
@@ -85,6 +86,7 @@ html, body, [class*="css"] {
     border: 2px dashed #5eb997;
     border-radius: 6px;
     min-height: 6rem;
+    width: 100%;
 }
 
 [data-testid="stFileUploader"] small,
@@ -99,6 +101,8 @@ html, body, [class*="css"] {
     border-radius: 6px !important;
     color: #ffffff !important;
     font-weight: 700;
+    min-height: 2.75rem;
+    min-width: 8rem;
 }
 
 [data-testid="stExpander"] {
@@ -448,7 +452,14 @@ def extract_resume_text(uploaded_file):
 
     if file_type == ".docx":
         document = Document(io.BytesIO(file_bytes))
-        resume_text = "\n".join(paragraph.text for paragraph in document.paragraphs).strip()
+        paragraph_text = [paragraph.text for paragraph in document.paragraphs]
+        table_text = [
+            cell.text
+            for table in document.tables
+            for row in table.rows
+            for cell in row.cells
+        ]
+        resume_text = "\n".join(paragraph_text + table_text).strip()
         if not resume_text:
             raise ValueError("The DOCX file contains no readable text. Please check the document and upload it again.")
         return resume_text
@@ -657,13 +668,14 @@ st.write(
     "interviews, jobs, and professional development."
 )
 st.subheader("Upload your resume")
-st.caption("Upload a PDF, DOCX, or TXT file to ask questions about your experience.")
+st.caption("Choose a resume from your phone, tablet, or computer. Supported formats: PDF, DOCX, TXT, JPG, JPEG, PNG, or WEBP.")
 
 uploaded_resume = st.file_uploader(
-    "Choose a resume file",
-    type=["pdf", "docx", "txt"],
+    "Choose a resume from your device",
+    type=["pdf", "docx", "txt", "jpg", "jpeg", "png", "webp"],
     key="resume_uploader",
-    help="Your resume stays in this session and is used only to answer your questions.",
+    accept_multiple_files=False,
+    help="Works on mobile, tablet, and PC. Select a PDF, DOCX, TXT, JPG, JPEG, PNG, or WEBP file from your device.",
 )
 
 process_uploaded_resume(uploaded_resume)
