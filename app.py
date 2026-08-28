@@ -322,6 +322,28 @@ PREFERRED_MODELS = [
 KNOWLEDGE_FILE = "universal_ai_career_assistant_knowledge_base.txt"
 REVIEWS_FILE = "career_assistant_reviews.json"
 FEEDBACK_RECIPIENT = "pranavkumar86530@gmail.com"
+DEFAULT_COUNTRY = "India"
+COUNTRY_ALIASES = {
+    "india": "India",
+    "indian": "India",
+    "united states": "United States",
+    "usa": "United States",
+    "us": "United States",
+    "america": "United States",
+    "united kingdom": "United Kingdom",
+    "uk": "United Kingdom",
+    "britain": "United Kingdom",
+    "canada": "Canada",
+    "australia": "Australia",
+    "new zealand": "New Zealand",
+    "germany": "Germany",
+    "france": "France",
+    "ireland": "Ireland",
+    "singapore": "Singapore",
+    "uae": "United Arab Emirates",
+    "dubai": "United Arab Emirates",
+    "saudi arabia": "Saudi Arabia",
+}
 
 
 # ============================================================
@@ -400,6 +422,20 @@ def search_knowledge(question, chunks, vectorizer, vectors):
     return "\n\n".join(relevant_chunks)
 
 
+def get_requested_country(question):
+
+    question_lower = question.lower()
+    country_matches = [
+        (alias, country)
+        for alias, country in COUNTRY_ALIASES.items()
+        if re.search(rf"\b{re.escape(alias)}\b", question_lower)
+    ]
+    if not country_matches:
+        return DEFAULT_COUNTRY
+
+    return max(country_matches, key=lambda match: len(match[0]))[1]
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def search_web(question, resume_text=""):
 
@@ -412,22 +448,43 @@ def search_web(question, resume_text=""):
     resume_hint = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "", resume_hint)
     resume_hint = re.sub(r"(?:\+?\d[\d ()-]{7,}\d)", "", resume_hint)
     current_year = datetime.now().year
+    requested_country = get_requested_country(question)
+    country_label = requested_country.lower()
     if resume_hint:
         query = (
-            f"{question} current {current_year} job openings companies hiring roles "
-            f"that match these skills: {resume_hint}"
+            f"{question} in {requested_country} current {current_year} "
+            f"{country_label} job openings "
+            f"companies hiring roles that match these skills: {resume_hint}"
         )
     else:
         query = (
-            f"{question} best companies employers industry leaders "
-            f"current {current_year} official company information"
+            f"{question} in {requested_country} best {country_label} companies "
+            f"employers industry leaders current {current_year} official company information"
         )
 
     try:
-        results = list(search_client().text(query, max_results=5))
+        results = list(search_client().text(query, max_results=8))
     except Exception as error:
         return [], f"Live web search was unavailable: {error}"
 
+    country_keywords = {
+        "India": (
+        "india", "indian", ".in/", ".in", "bangalore", "bengaluru", "mumbai",
+        "delhi", "hyderabad", "chennai", "pune", "gurugram", "noida", "kolkata",
+        ),
+        "United States": ("united states", "usa", ".us/", "new york", "california"),
+        "United Kingdom": ("united kingdom", "uk", ".uk/", "london", "manchester"),
+        "Canada": ("canada", ".ca/", "toronto", "vancouver", "montreal"),
+        "Australia": ("australia", ".au/", "sydney", "melbourne", "brisbane"),
+        "New Zealand": ("new zealand", ".nz/", "auckland", "wellington"),
+        "Germany": ("germany", ".de/", "berlin", "munich", "frankfurt"),
+        "France": ("france", ".fr/", "paris", "lyon"),
+        "Ireland": ("ireland", ".ie/", "dublin", "cork"),
+        "Singapore": ("singapore", ".sg/", "singapore"),
+        "United Arab Emirates": ("united arab emirates", "uae", "dubai", "abu dhabi"),
+        "Saudi Arabia": ("saudi arabia", "riyadh", "jeddah"),
+    }
+    target_keywords = country_keywords.get(requested_country, (country_label,))
     usable_results = [
         {
             "title": result.get("title", "Untitled result"),
@@ -437,10 +494,21 @@ def search_web(question, resume_text=""):
         for result in results
         if result.get("href")
     ]
+    usable_results.sort(
+        key=lambda result: any(
+            keyword in (
+                f"{result['title']} {result['url']} {result['snippet']}"
+            ).lower()
+            for keyword in target_keywords
+        ),
+        reverse=True,
+    )
+    usable_results = usable_results[:5]
     web_context = "\n\n".join(
         f"Title: {result['title']}\nURL: {result['url']}\nSnippet: {result['snippet']}"
         for result in usable_results
     )
+    web_context = f"Requested search market: {requested_country}\n\n{web_context}"
     return usable_results, web_context
 
 
@@ -474,11 +542,12 @@ practical steps or examples, and a thoughtful follow-up question when it would
 help the user continue. Give enough detail to be genuinely useful, usually
 around 6-10 bullet points or short paragraphs. Never stop after only one sentence.
 
-When live web results are provided, use them for current companies, roles,
-salary trends, and hiring information. Clearly label time-sensitive claims,
-tell the user to verify that a role is still open, and do not claim that a
-company is hiring based only on a search snippet. Never invent job listings or
-resume matches.
+When live web results are provided, use the requested search market shown in the
+context. India is the default market when the user does not name another
+country. If the user explicitly names another country, prioritize that country
+instead of India. Clearly label time-sensitive claims, tell the user to verify
+that a role is still open, and do not claim that a company is hiring based only
+on a search snippet. Never invent job listings or resume matches.
 """
 
     groq_client = get_groq_client()
