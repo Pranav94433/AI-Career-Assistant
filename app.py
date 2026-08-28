@@ -27,7 +27,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 st.set_page_config(
     page_title="AI Career Assistant",
     page_icon="🤖",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 st.markdown("""
@@ -59,7 +60,6 @@ html, body, [class*="css"] {
 /* Hide Streamlit and deployment branding controls. */
 #MainMenu,
 footer,
-[data-testid="stToolbar"],
 [data-testid="stDeployButton"],
 [data-testid="stStatusWidget"],
 [data-testid="stDecoration"],
