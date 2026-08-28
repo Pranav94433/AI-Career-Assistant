@@ -60,7 +60,13 @@ html, body, [class*="css"] {
 #MainMenu,
 footer,
 [data-testid="stToolbar"],
-[data-testid="stDeployButton"] {
+[data-testid="stDeployButton"],
+[data-testid="stStatusWidget"],
+[data-testid="stDecoration"],
+.stAppDeployButton,
+.stStatusWidget,
+[class*="stAppDeployButton"],
+[class*="stStatusWidget"] {
     visibility: hidden;
     display: none;
 }
