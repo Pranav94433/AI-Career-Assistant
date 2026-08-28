@@ -2,7 +2,7 @@
 
 ## AI provider
 
-The app uses Groq's hosted `llama-3.3-70b-versatile` model. No local Ollama installation is required.
+The app uses Groq hosted models and automatically selects an available supported model. No local Ollama installation is required.
 
 Create a Groq API key at https://console.groq.com/keys. Groq provides a free developer tier with usage limits.
 
@@ -35,6 +35,21 @@ SMTP_PORT = "465"
 ```
 
 The feedback recipient is already set in `app.py` to `pranavkumar86530@gmail.com`.
+
+## Current web results
+
+The app uses the `ddgs` package to search public web results when a user asks a
+question. No additional API key is required. The sidebar checkbox can disable
+live search, and the assistant continues using the local knowledge base if web
+search is unavailable. Verify job listings and other time-sensitive details
+because search snippets can become outdated.
+
+## ATS resume generation
+
+Users can generate an ATS-friendly resume from an uploaded resume, typed details,
+or both. The output is available as TXT and DOCX. The generator preserves only
+supplied facts, so users should review placeholders and every claim before
+applying.
 
 ## Security
 
