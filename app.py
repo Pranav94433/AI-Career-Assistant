@@ -4,11 +4,13 @@ try:
 except ImportError:
     Groq = None
 import io
+import json
 import os
 import re
 import base64
 import importlib
 import smtplib
+import uuid
 from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
@@ -312,6 +314,7 @@ PREFERRED_MODELS = [
 ]
 
 KNOWLEDGE_FILE = "universal_ai_career_assistant_knowledge_base.txt"
+REVIEWS_FILE = "career_assistant_reviews.json"
 FEEDBACK_RECIPIENT = "pranavkumar86530@gmail.com"
 
 
@@ -746,9 +749,70 @@ def send_feedback_email(rating, feedback):
 
     return True, "Feedback sent successfully. Thank you!"
 
+
+def load_reviews():
+
+    reviews_path = Path(REVIEWS_FILE)
+    if not reviews_path.exists():
+        return []
+
+    try:
+        reviews = json.loads(reviews_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+
+    return reviews if isinstance(reviews, list) else []
+
+
+def save_review(name, rating, feedback, owner_token):
+
+    reviews = load_reviews()
+    review_id = uuid.uuid4().hex
+    reviews.insert(
+        0,
+        {
+            "id": review_id,
+            "owner_token": owner_token,
+            "name": name.strip()[:80],
+            "rating": int(rating),
+            "feedback": feedback.strip()[:1000],
+            "created_at": datetime.now().strftime("%Y-%m-%d"),
+        },
+    )
+    Path(REVIEWS_FILE).write_text(
+        json.dumps(reviews[:50], ensure_ascii=True, indent=2),
+        encoding="utf-8",
+    )
+
+
+def delete_review(review_id, owner_token):
+
+    reviews = load_reviews()
+    matching_review = next(
+        (
+            review
+            for review in reviews
+            if review.get("id") == review_id
+            and review.get("owner_token") == owner_token
+        ),
+        None,
+    )
+    if matching_review is None:
+        return False
+
+    remaining_reviews = [review for review in reviews if review is not matching_review]
+    Path(REVIEWS_FILE).write_text(
+        json.dumps(remaining_reviews, ensure_ascii=True, indent=2),
+        encoding="utf-8",
+    )
+    return True
+
 # ============================================================
 # SIDEBAR
 # ============================================================
+
+if "review_owner_token" not in st.session_state:
+    st.session_state.review_owner_token = uuid.uuid4().hex
 
 with st.sidebar:
 
@@ -792,6 +856,11 @@ with st.sidebar:
         st.caption("Your feedback helps improve the career assistant.")
 
         with st.form("feedback_form", clear_on_submit=True):
+            feedback_name = st.text_input(
+                "Your name",
+                placeholder="Enter your name",
+                max_chars=80,
+            )
             feedback_rating = st.radio(
                 "How helpful was this chatbot?",
                 options=[1, 2, 3, 4, 5],
@@ -809,14 +878,52 @@ with st.sidebar:
             )
 
         if feedback_submitted:
-            feedback_sent, feedback_message = send_feedback_email(
-                feedback_rating,
-                feedback_text.strip(),
-            )
-            if feedback_sent:
-                st.success(feedback_message)
+            if not feedback_name.strip():
+                st.warning("Please enter your name before sending a review.")
             else:
-                st.warning(feedback_message)
+                save_review(
+                    feedback_name,
+                    feedback_rating,
+                    feedback_text,
+                    st.session_state.review_owner_token,
+                )
+                feedback_sent, feedback_message = send_feedback_email(
+                    feedback_rating,
+                    f"Name: {feedback_name.strip()}\n\n{feedback_text.strip()}",
+                )
+                if feedback_sent:
+                    st.success("Your review was added. " + feedback_message)
+                else:
+                    st.success("Your review was added and is visible below.")
+
+    with st.expander("See what others reviewed"):
+        reviews = load_reviews()
+        if not reviews:
+            st.caption("No reviews yet. Be the first to share your experience.")
+        else:
+            for review in reviews:
+                review_rating = max(1, min(5, int(review.get("rating", 0))))
+                reviewer_name = review.get("name", "Anonymous")
+                review_date = review.get("created_at", "")
+                st.write(
+                    f"{reviewer_name}  "
+                    f"{'★' * review_rating}{'☆' * (5 - review_rating)}"
+                    f"  {review_date}"
+                )
+                review_text = review.get("feedback", "")
+                if review_text:
+                    st.caption(review_text)
+                if review.get("owner_token") == st.session_state.review_owner_token:
+                    if st.button(
+                        "Delete my review",
+                        key=f"delete_review_{review.get('id', review_date)}",
+                    ):
+                        if delete_review(
+                            review.get("id"),
+                            st.session_state.review_owner_token,
+                        ):
+                            st.rerun()
+                st.divider()
 
     if st.session_state.get("messages"):
         st.caption(f"🧠 Memory active: {len(st.session_state.messages)} messages")
