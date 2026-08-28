@@ -5,7 +5,9 @@ except ImportError:
     Groq = None
 import io
 import os
+import re
 import base64
+import importlib
 import smtplib
 from datetime import datetime
 from email.message import EmailMessage
@@ -50,6 +52,15 @@ html, body, [class*="css"] {
 
 [data-testid="stHeader"] {
     background: transparent;
+}
+
+/* Hide Streamlit and deployment branding controls. */
+#MainMenu,
+footer,
+[data-testid="stToolbar"],
+[data-testid="stDeployButton"] {
+    visibility: hidden;
+    display: none;
 }
 
 [data-testid="stAppViewContainer"] * {
@@ -380,6 +391,50 @@ def search_knowledge(question, chunks, vectorizer, vectors):
     return "\n\n".join(relevant_chunks)
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def search_web(question, resume_text=""):
+
+    try:
+        search_client = importlib.import_module("ddgs").DDGS
+    except ImportError:
+        return [], "The live web search package is not installed."
+
+    resume_hint = " ".join(resume_text.split())[:1800]
+    resume_hint = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "", resume_hint)
+    resume_hint = re.sub(r"(?:\+?\d[\d ()-]{7,}\d)", "", resume_hint)
+    current_year = datetime.now().year
+    if resume_hint:
+        query = (
+            f"{question} current {current_year} job openings companies hiring roles "
+            f"that match these skills: {resume_hint}"
+        )
+    else:
+        query = (
+            f"{question} best companies employers industry leaders "
+            f"current {current_year} official company information"
+        )
+
+    try:
+        results = list(search_client().text(query, max_results=5))
+    except Exception as error:
+        return [], f"Live web search was unavailable: {error}"
+
+    usable_results = [
+        {
+            "title": result.get("title", "Untitled result"),
+            "url": result.get("href", ""),
+            "snippet": result.get("body", ""),
+        }
+        for result in results
+        if result.get("href")
+    ]
+    web_context = "\n\n".join(
+        f"Title: {result['title']}\nURL: {result['url']}\nSnippet: {result['snippet']}"
+        for result in usable_results
+    )
+    return usable_results, web_context
+
+
 # ============================================================
 # AI RESPONSE
 # ============================================================
@@ -409,6 +464,12 @@ Answer in a friendly structure with a direct answer, a brief explanation,
 practical steps or examples, and a thoughtful follow-up question when it would
 help the user continue. Give enough detail to be genuinely useful, usually
 around 6-10 bullet points or short paragraphs. Never stop after only one sentence.
+
+When live web results are provided, use them for current companies, roles,
+salary trends, and hiring information. Clearly label time-sensitive claims,
+tell the user to verify that a role is still open, and do not claim that a
+company is hiring based only on a search snippet. Never invent job listings or
+resume matches.
 """
 
     groq_client = get_groq_client()
@@ -435,6 +496,73 @@ around 6-10 bullet points or short paragraphs. Never stop after only one sentenc
         ]
 
     )
+
+
+def generate_ats_resume(source_resume, additional_details):
+
+    source_text = source_resume.strip() or "No existing resume was uploaded."
+    details_text = additional_details.strip() or "No additional details were provided."
+    prompt = f"""
+Create a polished, ATS-friendly resume from the candidate information below.
+Use only facts explicitly provided. Never invent employers, dates, degrees,
+certifications, job titles, metrics, skills, or contact information. If an
+important detail is missing, omit it or use a clear placeholder such as
+[Phone Number] rather than guessing.
+
+Return only the resume text, with no markdown fences, commentary, or explanation.
+Use this order when the information exists:
+1. Full name and contact information
+2. Professional summary tailored to the candidate's target role
+3. Core skills using standard searchable keywords
+4. Professional experience with concise achievement-focused bullet points
+5. Projects
+6. Education
+7. Certifications and additional information
+
+Keep formatting plain and ATS-compatible: simple headings, no tables, columns,
+icons, graphics, emojis, or decorative characters. Strengthen vague bullets
+only by rewriting the supplied facts; do not add unsupported accomplishments.
+
+Existing resume:
+{source_text[:16000]}
+
+Additional candidate details and target role:
+{details_text[:8000]}
+"""
+
+    groq_client = get_groq_client()
+    model_name = get_available_model(groq_client)
+    response = groq_client.chat.completions.create(
+        model=model_name,
+        temperature=0.1,
+        max_tokens=2500,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are an expert ATS resume writer who preserves factual accuracy.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+    )
+    return response.choices[0].message.content.strip()
+
+
+def create_resume_docx(resume_text):
+
+    document = Document()
+    for line in resume_text.splitlines():
+        stripped_line = line.strip()
+        if not stripped_line:
+            document.add_paragraph()
+        elif stripped_line.isupper() or stripped_line.endswith(":"):
+            document.add_heading(stripped_line.rstrip(":"), level=2)
+        else:
+            document.add_paragraph(stripped_line)
+
+    output = io.BytesIO()
+    document.save(output)
+    output.seek(0)
+    return output.getvalue()
 
 
 def extract_resume_text(uploaded_file):
@@ -636,6 +764,12 @@ with st.sidebar:
 
     st.subheader("What can I help with?")
 
+    live_search_enabled = st.checkbox(
+        "Use current web results",
+        value=True,
+        help="Searches the public web for current companies, roles, and market information.",
+    )
+
     topic_questions = {
         "Career guidance": "Give me personalized career guidance. Explain how I can choose a career direction based on my interests, education, experience, and current skills. Include practical next steps.",
         "Resume improvement": "Review my resume if I uploaded one and give detailed, actionable improvements for its content, structure, achievements, keywords, and formatting.",
@@ -769,6 +903,70 @@ except ValueError:
 
 
 # ============================================================
+# ATS RESUME GENERATOR
+# ============================================================
+
+st.subheader("Generate an ATS-friendly resume")
+st.caption("Use an uploaded resume, add your details below, or combine both.")
+
+with st.form("ats_resume_form"):
+    resume_details = st.text_area(
+        "Your details and target role",
+        placeholder=(
+            "Target role and location\n"
+            "Employment history, achievements, education, projects, skills, and certifications"
+        ),
+        height=180,
+        help="Add details that are missing from your uploaded resume. The generator will not invent information.",
+    )
+    generate_resume_submitted = st.form_submit_button(
+        "Generate ATS resume",
+        use_container_width=True,
+    )
+
+if generate_resume_submitted:
+    existing_resume = st.session_state.get("resume_text", "")
+    if not existing_resume and not resume_details.strip():
+        st.warning("Upload a resume or enter your details before generating.")
+    else:
+        with st.spinner("Creating your ATS-friendly resume..."):
+            try:
+                st.session_state.generated_ats_resume = generate_ats_resume(
+                    existing_resume,
+                    resume_details,
+                )
+            except Exception as error:
+                st.error(f"Could not generate the resume: {error}")
+
+generated_ats_resume = st.session_state.get("generated_ats_resume", "")
+if generated_ats_resume:
+    st.success("ATS-friendly resume generated. Review every detail before submitting applications.")
+    st.text_area(
+        "Generated resume",
+        value=generated_ats_resume,
+        height=520,
+        key="generated_ats_resume_preview",
+    )
+    download_columns = st.columns(2)
+    with download_columns[0]:
+        st.download_button(
+            "Download TXT",
+            data=generated_ats_resume,
+            file_name="ats_resume.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+    with download_columns[1]:
+        st.download_button(
+            "Download DOCX",
+            data=create_resume_docx(generated_ats_resume),
+            file_name="ats_resume.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
+        )
+
+
+# ============================================================
 # CHAT HISTORY
 # ============================================================
 
@@ -865,6 +1063,19 @@ if user_question:
                         f"{resume_context[:12000]}"
                     )
 
+                web_results = []
+                if live_search_enabled:
+                    web_results, web_context = search_web(
+                        user_question,
+                        resume_context,
+                    )
+                    if web_context:
+                        knowledge_context = (
+                            f"{knowledge_context}\n\n"
+                            "Current public web search results (verify before relying on them):\n"
+                            f"{web_context}"
+                        )
+
 
                 response = get_ai_response(
 
@@ -890,6 +1101,16 @@ if user_question:
                     }
 
                 )
+
+                if web_results:
+                    with st.expander("Current web sources", expanded=False):
+                        st.caption("Search results retrieved now. Check each source for the latest details.")
+                        for result in web_results:
+                            st.link_button(
+                                result["title"][:100],
+                                result["url"],
+                                use_container_width=True,
+                            )
 
 
             except Exception as error:
