@@ -51,6 +51,17 @@ or both. The output is available as TXT and DOCX. The generator preserves only
 supplied facts, so users should review placeholders and every claim before
 applying.
 
+## Public reviews
+
+The feedback form asks for a name and displays submitted ratings and comments
+under **See what others reviewed**. Reviews are stored in
+`career_assistant_reviews.json`, which is created automatically and should not
+be committed to GitHub if it contains personal information. Streamlit Community
+Cloud storage can be reset when the app restarts, so use a hosted database for
+permanent cross-user reviews. A **Delete my review** button is shown only to the
+browser session that submitted that review; reviews created before this feature
+will not have a delete button.
+
 ## Security
 
 Never upload `secrets.toml` to GitHub. If an app password has ever been shared or committed, revoke it in Google Account settings and create a new one.
