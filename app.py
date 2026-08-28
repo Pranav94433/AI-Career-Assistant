@@ -834,12 +834,6 @@ with st.sidebar:
 
     st.subheader("What can I help with?")
 
-    live_search_enabled = st.checkbox(
-        "Use current web results",
-        value=True,
-        help="Searches the public web for current companies, roles, and market information.",
-    )
-
     topic_questions = {
         "Career guidance": "Give me personalized career guidance. Explain how I can choose a career direction based on my interests, education, experience, and current skills. Include practical next steps.",
         "Resume improvement": "Review my resume if I uploaded one and give detailed, actionable improvements for its content, structure, achievements, keywords, and formatting.",
@@ -1176,18 +1170,16 @@ if user_question:
                         f"{resume_context[:12000]}"
                     )
 
-                web_results = []
-                if live_search_enabled:
-                    web_results, web_context = search_web(
-                        user_question,
-                        resume_context,
+                web_results, web_context = search_web(
+                    user_question,
+                    resume_context,
+                )
+                if web_context:
+                    knowledge_context = (
+                        f"{knowledge_context}\n\n"
+                        "Current public web search results (verify before relying on them):\n"
+                        f"{web_context}"
                     )
-                    if web_context:
-                        knowledge_context = (
-                            f"{knowledge_context}\n\n"
-                            "Current public web search results (verify before relying on them):\n"
-                            f"{web_context}"
-                        )
 
 
                 response = get_ai_response(
