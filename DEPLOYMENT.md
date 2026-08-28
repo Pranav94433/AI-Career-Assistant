@@ -44,6 +44,9 @@ assistant continues using the local knowledge base if web search is unavailable.
 Verify job listings and other time-sensitive details because search snippets can
 become outdated.
 
+India is the default search market. Indian companies, India-based roles, and INR
+salary information are prioritized in search results and generated answers.
+
 ## ATS resume generation
 
 Users can generate an ATS-friendly resume from an uploaded resume, typed details,
