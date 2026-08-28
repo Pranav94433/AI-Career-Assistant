@@ -39,10 +39,10 @@ The feedback recipient is already set in `app.py` to `pranavkumar86530@gmail.com
 ## Current web results
 
 The app uses the `ddgs` package to search public web results when a user asks a
-question. No additional API key is required. The sidebar checkbox can disable
-live search, and the assistant continues using the local knowledge base if web
-search is unavailable. Verify job listings and other time-sensitive details
-because search snippets can become outdated.
+question. No additional API key is required. Live search is always used, and the
+assistant continues using the local knowledge base if web search is unavailable.
+Verify job listings and other time-sensitive details because search snippets can
+become outdated.
 
 ## ATS resume generation
 
